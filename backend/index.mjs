@@ -1,7 +1,10 @@
 import express from "express";
+import cors from "cors";
 import sqlite3 from "sqlite3";
 import { open } from "sqlite";
-import cors from "cors";
+import questionRoutes from "./routes/questions.js";
+import leaderboardRoutes from "./routes/leaderboard.js";
+import answersRoutes from "./routes/answers.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -9,9 +12,8 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
-let db;
+export let db;
 
-// Initialize SQLite and create tables
 const init = async () => {
   db = await open({ filename: "./devquest.db", driver: sqlite3.Database });
 
@@ -37,35 +39,22 @@ const init = async () => {
     );
   `);
 
-  await db.exec(\`
+  await db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       address TEXT PRIMARY KEY,
       questions_asked INTEGER DEFAULT 0,
       answers_posted INTEGER DEFAULT 0,
       rewards_earned INTEGER DEFAULT 0
     );
-  \`);
+  `);
+
+  app.use("/questions", questionRoutes);
+  app.use("/leaderboard", leaderboardRoutes);
+  app.use("/answers", answersRoutes);
+
+  app.listen(PORT, () => {
+    console.log(`DevQuest backend running on http://localhost:${PORT}`);
+  });
 };
 
-app.get("/questions", async (req, res) => {
-  const questions = await db.all("SELECT * FROM questions ORDER BY id DESC");
-  res.json(questions);
-});
-
-app.get("/questions/:id", async (req, res) => {
-  const { id } = req.params;
-  const question = await db.get("SELECT * FROM questions WHERE id = ?", id);
-  const answers = await db.all("SELECT * FROM answers WHERE question_id = ?", id);
-  res.json({ question, answers });
-});
-
-app.get("/leaderboard", async (req, res) => {
-  const leaders = await db.all("SELECT * FROM users ORDER BY rewards_earned DESC LIMIT 10");
-  res.json(leaders);
-});
-
-init().then(() => {
-  app.listen(PORT, () => {
-    console.log(`DevQuest backend running on http://localhost:\${PORT}`);
-  });
-});
+init();
